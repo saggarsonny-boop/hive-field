@@ -39,23 +39,33 @@ type AppState =
   | { phase: "playing"; scenario: Scenario; currentStep: Step; choices: UserChoice[] }
   | { phase: "consequence"; scenario: Scenario; consequence: string; nextStepId: string | null; choices: UserChoice[] }
   | { phase: "evaluating" }
-  | { phase: "done"; evaluation: string; scenario: Scenario; choices: UserChoice[] };
+  | { phase: "done"; evaluation: string; scenario: Scenario; choices: UserChoice[] }
+  | { phase: "error"; message: string };
 
 export default function HiveField() {
   const [profession, setProfession] = useState("");
   const [state, setState] = useState<AppState>({ phase: "select" });
 
   async function startScenario() {
-    if (!profession.trim()) return;
+    const trimmed = profession.trim();
+    if (!trimmed) return;
     setState({ phase: "loading" });
-    const res = await fetch("/api/scenario", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profession }),
-    });
-    if (!res.ok) { setState({ phase: "select" }); return; }
-    const scenario: Scenario = await res.json();
-    setState({ phase: "playing", scenario, currentStep: scenario.steps[0], choices: [] });
+    try {
+      const res = await fetch("/api/scenario", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profession: trimmed }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        setState({ phase: "error", message: `API error ${res.status}: ${text}` });
+        return;
+      }
+      const scenario: Scenario = await res.json();
+      setState({ phase: "playing", scenario, currentStep: scenario.steps[0], choices: [] });
+    } catch (err) {
+      setState({ phase: "error", message: String(err) });
+    }
   }
 
   function handleChoice(step: Step, branchId: string, scenario: Scenario, existingChoices: UserChoice[]) {
@@ -85,13 +95,17 @@ export default function HiveField() {
 
   async function evaluate(scenario: Scenario, choices: UserChoice[]) {
     setState({ phase: "evaluating" });
-    const res = await fetch("/api/evaluate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scenario, choices, profession }),
-    });
-    const data = await res.json();
-    setState({ phase: "done", evaluation: data.evaluation, scenario, choices });
+    try {
+      const res = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scenario, choices, profession }),
+      });
+      const data = await res.json();
+      setState({ phase: "done", evaluation: data.evaluation, scenario, choices });
+    } catch (err) {
+      setState({ phase: "error", message: String(err) });
+    }
   }
 
   function reset() {
@@ -113,15 +127,16 @@ export default function HiveField() {
                 type="text"
                 value={profession}
                 onChange={(e) => setProfession(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && startScenario()}
-                placeholder="e.g. snake handler, anxious spouse, ICU nurse, hostage negotiator..."
+                onKeyDown={(e) => { if (e.key === "Enter") startScenario(); }}
+                placeholder="snake handler, anxious spouse, ICU nurse, hostage negotiator..."
+                autoFocus
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-gray-400"
               />
             </div>
             <button
               onClick={startScenario}
               disabled={!profession.trim()}
-              className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg disabled:opacity-30 hover:bg-amber-300 transition-colors"
+              className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg disabled:opacity-30 hover:bg-amber-300 transition-colors cursor-pointer"
             >
               Start scenario
             </button>
@@ -132,10 +147,22 @@ export default function HiveField() {
           <div className="text-gray-500 text-center py-20">Building your scenario...</div>
         )}
 
+        {state.phase === "error" && (
+          <div className="space-y-4">
+            <p className="text-red-400 text-sm font-mono bg-gray-900 rounded p-4">{state.message}</p>
+            <button
+              onClick={reset}
+              className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg hover:bg-amber-300 transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
         {state.phase === "playing" && (
           <div className="space-y-6">
-            <div className="flex items-center gap-2 text-xs text-gray-600 uppercase tracking-widest">
-              <span>Step {state.currentStep.stepNumber} of {state.scenario.steps.length}</span>
+            <div className="text-xs text-gray-600 uppercase tracking-widest">
+              Step {state.currentStep.stepNumber} of {state.scenario.steps.length}
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-100 mb-3">{state.scenario.title}</h2>
@@ -155,7 +182,7 @@ export default function HiveField() {
                 <button
                   key={branch.id}
                   onClick={() => handleChoice(state.currentStep, branch.id, state.scenario, state.choices)}
-                  className="w-full text-left bg-gray-900 border border-gray-800 hover:border-gray-500 rounded-lg px-4 py-3 text-sm text-gray-200 transition-colors"
+                  className="w-full text-left bg-gray-900 border border-gray-800 hover:border-gray-500 active:bg-gray-800 rounded-lg px-4 py-3 text-sm text-gray-200 transition-colors cursor-pointer"
                 >
                   {branch.text}
                 </button>
@@ -170,7 +197,7 @@ export default function HiveField() {
             <p className="text-gray-200 leading-relaxed text-lg">{state.consequence}</p>
             <button
               onClick={() => advance(state.scenario, state.nextStepId, state.choices)}
-              className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg hover:bg-amber-300 transition-colors"
+              className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg hover:bg-amber-300 transition-colors cursor-pointer"
             >
               {state.nextStepId ? "Continue" : "Get Yoda's evaluation"}
             </button>
@@ -198,7 +225,7 @@ export default function HiveField() {
             </div>
             <button
               onClick={reset}
-              className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg hover:bg-amber-300 transition-colors"
+              className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg hover:bg-amber-300 transition-colors cursor-pointer"
             >
               Run another scenario
             </button>
