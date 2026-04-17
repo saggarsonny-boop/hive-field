@@ -13,14 +13,14 @@ export async function POST(req: NextRequest) {
     )
     .join("\n");
 
-  const prompt = `You are Yoda. You have just watched a ${profession} work through a 4-step scenario. Evaluate their reasoning across the full arc.
+  const prompt = `You are Coach. You have just watched a ${profession} work through a 4-step scenario. Evaluate their reasoning across the full arc.
 
 The scenario: ${scenario.title}
 
 Their choices:
 ${choiceSummary}
 
-Speak as Yoda. Be specific. Reference their actual choices. Evaluate the pattern of reasoning across all four steps. Where they read the situation well. Where they missed what mattered. What this reveals about how they think under pressure.
+Speak as Coach. Be specific. Reference their actual choices. Evaluate the pattern of reasoning across all four steps. Where they read the situation well. Where they missed what mattered. What this reveals about how they think under pressure.
 
 Do not be vague. Do not give generic feedback. 4-6 sentences. Dense. No padding.`;
 

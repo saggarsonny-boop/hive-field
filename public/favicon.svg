@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd700" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ffd700" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#ffd700"/>
+      <stop offset="40%" stop-color="#b8860b"/>
+      <stop offset="100%" stop-color="#3a2000"/>
+    </linearGradient>
+    <linearGradient id="face" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#1e2c1a"/>
+      <stop offset="100%" stop-color="#060c08"/>
+    </linearGradient>
+    <radialGradient id="specular" cx="32%" cy="22%" r="45%">
+      <stop offset="0%" stop-color="#ffd700" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur-glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- outer glow -->
+  <circle cx="50" cy="50" r="48" fill="url(#glow)"/>
+  <!-- rim -->
+  <polygon points="50,4 92,27 92,73 50,96 8,73 8,27" fill="url(#rim)" filter="url(#blur-glow)"/>
+  <!-- face -->
+  <polygon points="50,10 86,30 86,70 50,90 14,70 14,30" fill="url(#face)"/>
+  <!-- specular -->
+  <polygon points="50,10 86,30 86,70 50,90 14,70 14,30" fill="url(#specular)"/>
+  <!-- inner edge -->
+  <polygon points="50,16 80,33 80,67 50,84 20,67 20,33" fill="none" stroke="#b8860b" stroke-width="0.8" stroke-opacity="0.5"/>
+</svg>

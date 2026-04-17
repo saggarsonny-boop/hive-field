@@ -199,19 +199,19 @@ export default function HiveField() {
               onClick={() => advance(state.scenario, state.nextStepId, state.choices)}
               className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg hover:bg-amber-300 transition-colors cursor-pointer"
             >
-              {state.nextStepId ? "Continue" : "Get Yoda's evaluation"}
+              {state.nextStepId ? "Continue" : "Get Coach's evaluation"}
             </button>
           </div>
         )}
 
         {state.phase === "evaluating" && (
-          <div className="text-gray-500 text-center py-20">Yoda is thinking...</div>
+          <div className="text-gray-500 text-center py-20">Coach is thinking...</div>
         )}
 
         {state.phase === "done" && (
           <div className="space-y-8">
             <div>
-              <p className="text-xs text-gray-600 uppercase tracking-widest mb-4">Yoda speaks</p>
+              <p className="text-xs text-gray-600 uppercase tracking-widest mb-4">Coach speaks</p>
               <p className="text-gray-100 leading-relaxed whitespace-pre-wrap">{state.evaluation}</p>
             </div>
             <div className="border-t border-gray-800 pt-6 space-y-2">
