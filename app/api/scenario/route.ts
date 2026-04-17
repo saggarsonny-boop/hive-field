@@ -3,38 +3,152 @@ import { NextRequest, NextResponse } from "next/server";
 
 const client = new Anthropic();
 
-export async function POST(request: NextRequest) {
-  const { profession } = await request.json();
+export async function POST(req: NextRequest) {
+  const { profession } = await req.json();
 
-  const message = await client.messages.create({
-    model: "claude-opus-4-5",
-    max_tokens: 1024,
-    messages: [
-      {
-        role: "user",
-        content: `You are a scenario generator for HiveField. Generate a scenario for a ${profession}. Return ONLY raw JSON, no markdown, no code blocks. Use this exact structure: {"title":"...","situation":"...","clues":[{"id":1,"text":"...","isHinge":false,"isDistractor":false},{"id":2,"text":"...","isHinge":false,"isDistractor":false},{"id":3,"text":"...","isHinge":true,"isDistractor":false},{"id":4,"text":"...","isHinge":false,"isDistractor":true},{"id":5,"text":"...","isHinge":false,"isDistractor":false}],"question":"What is happening and what do you do?","correctDiagnosis":"...","systematicMethod":"...","keyPrinciple":"..."}`,
-      },
-    ],
-  });
+  const prompt = `You are generating a multi-step branching reasoning scenario for a ${profession}.
 
-  const content = message.content[0];
-  if (content.type !== "text") {
-    return NextResponse.json({ error: "Invalid response" }, { status: 500 });
-  }
+Generate a scenario with exactly 4 steps. Each step presents a situation that evolves. The scenario should feel like a real unfolding case.
 
-  const cleaned = content.text
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
+Return ONLY valid JSON. No markdown, no explanation, no backticks. Exactly this structure:
+
+{
+  "id": "unique-id-string",
+  "profession": "${profession}",
+  "title": "Brief case title",
+  "steps": [
+    {
+      "id": "step-1",
+      "stepNumber": 1,
+      "situation": "What is happening right now. Specific and concrete.",
+      "clues": ["clue 1", "clue 2", "clue 3"],
+      "hingeClue": "The single most important clue that changes everything",
+      "distractor": "A plausible-sounding but misleading piece of information",
+      "branches": [
+        {
+          "id": "1a",
+          "text": "Option A",
+          "consequence": "What happens immediately after this choice. 1-2 sentences.",
+          "nextStepId": "step-2"
+        },
+        {
+          "id": "1b",
+          "text": "Option B",
+          "consequence": "What happens immediately after this choice. 1-2 sentences.",
+          "nextStepId": "step-2"
+        },
+        {
+          "id": "1c",
+          "text": "Option C",
+          "consequence": "What happens immediately after this choice. 1-2 sentences.",
+          "nextStepId": "step-2"
+        }
+      ]
+    },
+    {
+      "id": "step-2",
+      "stepNumber": 2,
+      "situation": "Situation has evolved. Things have changed.",
+      "clues": ["clue 1", "clue 2", "clue 3"],
+      "hingeClue": "The single most important clue",
+      "distractor": "A plausible but misleading detail",
+      "branches": [
+        {
+          "id": "2a",
+          "text": "Option A",
+          "consequence": "Immediate consequence.",
+          "nextStepId": "step-3"
+        },
+        {
+          "id": "2b",
+          "text": "Option B",
+          "consequence": "Immediate consequence.",
+          "nextStepId": "step-3"
+        },
+        {
+          "id": "2c",
+          "text": "Option C",
+          "consequence": "Immediate consequence.",
+          "nextStepId": "step-3"
+        }
+      ]
+    },
+    {
+      "id": "step-3",
+      "stepNumber": 3,
+      "situation": "A complication or new development. Stakes are clearer now.",
+      "clues": ["clue 1", "clue 2", "clue 3"],
+      "hingeClue": "The single most important clue",
+      "distractor": "A plausible but misleading detail",
+      "branches": [
+        {
+          "id": "3a",
+          "text": "Option A",
+          "consequence": "Immediate consequence.",
+          "nextStepId": "step-4"
+        },
+        {
+          "id": "3b",
+          "text": "Option B",
+          "consequence": "Immediate consequence.",
+          "nextStepId": "step-4"
+        },
+        {
+          "id": "3c",
+          "text": "Option C",
+          "consequence": "Immediate consequence.",
+          "nextStepId": "step-4"
+        }
+      ]
+    },
+    {
+      "id": "step-4",
+      "stepNumber": 4,
+      "situation": "The resolution moment. Final decision that determines the outcome.",
+      "clues": ["clue 1", "clue 2", "clue 3"],
+      "hingeClue": "The single most important clue",
+      "distractor": "A plausible but misleading detail",
+      "branches": [
+        {
+          "id": "4a",
+          "text": "Option A",
+          "consequence": "Final outcome A.",
+          "nextStepId": null
+        },
+        {
+          "id": "4b",
+          "text": "Option B",
+          "consequence": "Final outcome B.",
+          "nextStepId": null
+        },
+        {
+          "id": "4c",
+          "text": "Option C",
+          "consequence": "Final outcome C.",
+          "nextStepId": null
+        }
+      ]
+    }
+  ]
+}`;
 
   try {
-    const scenario = JSON.parse(cleaned);
-    if (!scenario.clues || !Array.isArray(scenario.clues)) {
-      return NextResponse.json({ error: "Missing clues" }, { status: 500 });
+    const message = await client.messages.create({
+      model: "claude-opus-4-5",
+      max_tokens: 4096,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const content = message.content[0];
+    if (content.type !== "text") {
+      return NextResponse.json({ error: "Unexpected response type" }, { status: 500 });
     }
+
+    const text = content.text.replace(/```json|```/g, "").trim();
+    const scenario = JSON.parse(text);
     return NextResponse.json(scenario);
-  } catch (e) {
-    console.error("Raw response:", content.text);
-    return NextResponse.json({ error: "Parse error" }, { status: 500 });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "Failed to generate scenario" }, { status: 500 });
   }
 }

@@ -3,58 +3,42 @@ import { NextRequest, NextResponse } from "next/server";
 
 const client = new Anthropic();
 
-export async function POST(request: NextRequest) {
-  const { profession, scenario, userAnswer, requestType } = await request.json();
+export async function POST(req: NextRequest) {
+  const { scenario, choices, profession } = await req.json();
 
-  const isHint = requestType === "hint";
+  const choiceSummary = choices
+    .map(
+      (c: { stepNumber: number; situation: string; chosenBranch: { text: string; consequence: string } }) =>
+        `Step ${c.stepNumber}: "${c.situation.slice(0, 100)}..." — Chose: "${c.chosenBranch.text}" — Result: "${c.chosenBranch.consequence}"`
+    )
+    .join("\n");
 
-  const prompt = isHint
-    ? `You are Yoda training a ${profession}. 
-    
-The scenario: ${scenario.situation}
-The clues presented: ${scenario.clues.map((c: {text: string}) => c.text).join(", ")}
-The systematic method for this profession: ${scenario.systematicMethod}
+  const prompt = `You are Yoda. You have just watched a ${profession} work through a 4-step scenario. Evaluate their reasoning across the full arc.
 
-The student has not answered yet and wants a hint.
+The scenario: ${scenario.title}
 
-Give guidance WITHOUT giving the answer. Like Yoda would:
-- Reference the systematic method by name
-- Ask a question that directs their thinking
-- Point to the field, not the answer
-- Maximum 3 sentences
-- Do not reveal what the correct diagnosis is`
-    : `You are Yoda evaluating a ${profession}'s reasoning.
+Their choices:
+${choiceSummary}
 
-The scenario: ${scenario.situation}
-The clues: ${scenario.clues.map((c: {text: string}) => c.text).join(", ")}
-The correct answer: ${scenario.correctDiagnosis}
-The systematic method: ${scenario.systematicMethod}
-The key principle: ${scenario.keyPrinciple}
+Speak as Yoda. Be specific. Reference their actual choices. Evaluate the pattern of reasoning across all four steps. Where they read the situation well. Where they missed what mattered. What this reveals about how they think under pressure.
 
-The student answered: "${userAnswer}"
+Do not be vague. Do not give generic feedback. 4-6 sentences. Dense. No padding.`;
 
-Evaluate their reasoning. Be direct but not crushing. 
-- Was their answer correct, partially correct, or incorrect?
-- What did they see well?
-- What did they miss?
-- Which clue was the hinge and why?
-- Which was the distractor and why?
-- Reinforce the systematic method
-- End with one principle they should carry forward
+  try {
+    const message = await client.messages.create({
+      model: "claude-opus-4-5",
+      max_tokens: 600,
+      messages: [{ role: "user", content: prompt }],
+    });
 
-Do not just give the answer next time. Teach the pattern of thinking.
-Maximum 200 words.`;
+    const content = message.content[0];
+    if (content.type !== "text") {
+      return NextResponse.json({ error: "Unexpected response type" }, { status: 500 });
+    }
 
-  const message = await client.messages.create({
-    model: "claude-opus-4-5",
-    max_tokens: 512,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const content = message.content[0];
-  if (content.type !== "text") {
-    return NextResponse.json({ error: "Invalid response" }, { status: 500 });
+    return NextResponse.json({ evaluation: content.text });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "Evaluation failed" }, { status: 500 });
   }
-
-  return NextResponse.json({ feedback: content.text });
 }

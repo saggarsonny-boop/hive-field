@@ -2,215 +2,222 @@
 
 import { useState } from "react";
 
-interface Clue {
-  id: number;
+type Branch = {
+  id: string;
   text: string;
-  isHinge: boolean;
-  isDistractor: boolean;
-}
+  consequence: string;
+  nextStepId: string | null;
+};
 
-interface Scenario {
-  title: string;
+type Step = {
+  id: string;
+  stepNumber: number;
   situation: string;
-  clues: Clue[];
-  question: string;
-  correctDiagnosis: string;
-  systematicMethod: string;
-  keyPrinciple: string;
-}
+  clues: string[];
+  hingeClue: string;
+  distractor: string;
+  branches: Branch[];
+};
+
+type Scenario = {
+  id: string;
+  profession: string;
+  title: string;
+  steps: Step[];
+};
+
+type UserChoice = {
+  stepId: string;
+  stepNumber: number;
+  situation: string;
+  chosenBranch: Branch;
+};
+
+type AppState =
+  | { phase: "select" }
+  | { phase: "loading" }
+  | { phase: "playing"; scenario: Scenario; currentStep: Step; choices: UserChoice[] }
+  | { phase: "consequence"; scenario: Scenario; consequence: string; nextStepId: string | null; choices: UserChoice[] }
+  | { phase: "evaluating" }
+  | { phase: "done"; evaluation: string; scenario: Scenario; choices: UserChoice[] };
+
+const PROFESSIONS = [
+  "Emergency Physician",
+  "ICU Nurse",
+  "Paramedic",
+  "General Practitioner",
+  "Surgeon",
+  "Psychiatrist",
+  "Pharmacist",
+  "Radiologist",
+];
 
 export default function HiveField() {
-  const [profession, setProfession] = useState("Emergency Physician");
-  const [scenario, setScenario] = useState<Scenario | null>(null);
-  const [answer, setAnswer] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const [hint, setHint] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [evaluating, setEvaluating] = useState(false);
-  const [hinting, setHinting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [profession, setProfession] = useState("");
+  const [state, setState] = useState<AppState>({ phase: "select" });
 
-  const generateScenario = async () => {
-    setLoading(true);
-    setScenario(null);
-    setAnswer("");
-    setFeedback("");
-    setHint("");
-    setSubmitted(false);
-    try {
-      const res = await fetch("/api/scenario", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profession }),
-      });
-      const data = await res.json();
-      setScenario(data);
-    } catch {
-      alert("Error generating scenario. Check your API key.");
-    }
-    setLoading(false);
-  };
+  async function startScenario() {
+    if (!profession) return;
+    setState({ phase: "loading" });
+    const res = await fetch("/api/scenario", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profession }),
+    });
+    if (!res.ok) { setState({ phase: "select" }); return; }
+    const scenario: Scenario = await res.json();
+    setState({ phase: "playing", scenario, currentStep: scenario.steps[0], choices: [] });
+  }
 
-  const getHint = async () => {
-    if (!scenario) return;
-    setHinting(true);
-    try {
-      const res = await fetch("/api/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profession,
-          scenario,
-          userAnswer: "",
-          requestType: "hint",
-        }),
-      });
-      const data = await res.json();
-      setHint(data.feedback);
-    } catch {
-      alert("Error getting hint.");
-    }
-    setHinting(false);
-  };
+  function handleChoice(step: Step, branchId: string, scenario: Scenario, existingChoices: UserChoice[]) {
+    const branch = step.branches.find((b) => b.id === branchId);
+    if (!branch) return;
+    const newChoice: UserChoice = {
+      stepId: step.id,
+      stepNumber: step.stepNumber,
+      situation: step.situation,
+      chosenBranch: branch,
+    };
+    setState({
+      phase: "consequence",
+      scenario,
+      consequence: branch.consequence,
+      nextStepId: branch.nextStepId,
+      choices: [...existingChoices, newChoice],
+    });
+  }
 
-  const submitAnswer = async () => {
-    if (!scenario || !answer.trim()) return;
-    setEvaluating(true);
-    try {
-      const res = await fetch("/api/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profession,
-          scenario,
-          userAnswer: answer,
-          requestType: "evaluate",
-        }),
-      });
-      const data = await res.json();
-      setFeedback(data.feedback);
-      setSubmitted(true);
-    } catch {
-      alert("Error evaluating answer.");
-    }
-    setEvaluating(false);
-  };
+  function advance(scenario: Scenario, nextStepId: string | null, choices: UserChoice[]) {
+    if (!nextStepId) { evaluate(scenario, choices); return; }
+    const nextStep = scenario.steps.find((s) => s.id === nextStepId);
+    if (!nextStep) { evaluate(scenario, choices); return; }
+    setState({ phase: "playing", scenario, currentStep: nextStep, choices });
+  }
+
+  async function evaluate(scenario: Scenario, choices: UserChoice[]) {
+    setState({ phase: "evaluating" });
+    const res = await fetch("/api/evaluate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scenario, choices, profession }),
+    });
+    const data = await res.json();
+    setState({ phase: "done", evaluation: data.evaluation, scenario, choices });
+  }
+
+  function reset() {
+    setState({ phase: "select" });
+    setProfession("");
+  }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-gray-100 p-6 max-w-3xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-amber-400 mb-1">HiveField</h1>
-        <p className="text-gray-400 text-sm">
-          Reasoning training. Every scenario sharpens the pattern.
-        </p>
-      </div>
+    <main className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-start px-4 py-12">
+      <div className="w-full max-w-2xl">
+        <h1 className="text-3xl font-bold tracking-tight mb-2">HiveField</h1>
+        <p className="text-gray-500 text-sm mb-10">Reasoning under pressure. Multi-step. No hand-holding.</p>
 
-      <div className="mb-6 flex gap-3">
-        <input
-          type="text"
-          value={profession}
-          onChange={(e) => setProfession(e.target.value)}
-          placeholder="Your profession"
-          className="flex-1 bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white focus:outline-none focus:border-amber-400"
-        />
-        <button
-          onClick={generateScenario}
-          disabled={loading}
-          className="bg-amber-400 text-gray-950 font-semibold px-6 py-2 rounded hover:bg-amber-300 disabled:opacity-50 transition"
-        >
-          {loading ? "Generating..." : "New Scenario"}
-        </button>
-      </div>
-
-      {scenario && (
-        <div className="space-y-6">
-          <div className="bg-gray-900 border border-gray-700 rounded-lg p-5">
-            <h2 className="text-amber-400 font-semibold text-lg mb-2">
-              {scenario.title}
-            </h2>
-            <p className="text-gray-200 leading-relaxed">{scenario.situation}</p>
-          </div>
-
-          <div className="bg-gray-900 border border-gray-700 rounded-lg p-5">
-            <h3 className="text-gray-400 text-sm font-semibold uppercase tracking-wide mb-3">
-              Findings
-            </h3>
-            <ul className="space-y-2">
-              {scenario.clues.map((clue) => (
-                <li key={clue.id} className="flex items-start gap-2">
-                  <span className="text-amber-400 mt-1">›</span>
-                  <span className="text-gray-200">{clue.text}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="bg-gray-900 border border-gray-700 rounded-lg p-5">
-            <p className="text-white font-medium mb-4">{scenario.question}</p>
-
-            {!submitted && (
-              <>
-                <textarea
-                  value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="Your assessment and plan..."
-                  rows={4}
-                  className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-3 text-white focus:outline-none focus:border-amber-400 resize-none mb-3"
-                />
-                <div className="flex gap-3">
-                  <button
-                    onClick={submitAnswer}
-                    disabled={evaluating || !answer.trim()}
-                    className="bg-amber-400 text-gray-950 font-semibold px-6 py-2 rounded hover:bg-amber-300 disabled:opacity-50 transition"
-                  >
-                    {evaluating ? "Evaluating..." : "Submit"}
-                  </button>
-                  <button
-                    onClick={getHint}
-                    disabled={hinting}
-                    className="border border-gray-600 text-gray-300 px-6 py-2 rounded hover:border-amber-400 hover:text-amber-400 disabled:opacity-50 transition"
-                  >
-                    {hinting ? "Thinking..." : "Hint"}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {hint && !submitted && (
-              <div className="mt-4 bg-gray-800 border border-amber-400/30 rounded p-4">
-                <p className="text-amber-300 text-sm font-semibold mb-1">
-                  Yoda says:
-                </p>
-                <p className="text-gray-200 text-sm leading-relaxed">{hint}</p>
-              </div>
-            )}
-          </div>
-
-          {feedback && (
-            <div className="bg-gray-900 border border-amber-400/50 rounded-lg p-5">
-              <h3 className="text-amber-400 font-semibold mb-3">Assessment</h3>
-              <p className="text-gray-200 leading-relaxed whitespace-pre-wrap">
-                {feedback}
-              </p>
-              <button
-                onClick={generateScenario}
-                className="mt-4 bg-amber-400 text-gray-950 font-semibold px-6 py-2 rounded hover:bg-amber-300 transition"
+        {state.phase === "select" && (
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Your profession</label>
+              <select
+                value={profession}
+                onChange={(e) => setProfession(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-400"
               >
-                Next Scenario
-              </button>
+                <option value="">Select...</option>
+                {PROFESSIONS.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
             </div>
-          )}
-        </div>
-      )}
+            <button
+              onClick={startScenario}
+              disabled={!profession}
+              className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg disabled:opacity-30 hover:bg-amber-300 transition-colors"
+            >
+              Start scenario
+            </button>
+          </div>
+        )}
 
-      {!scenario && !loading && (
-        <div className="text-center text-gray-600 mt-20">
-          <p>Enter your profession and generate a scenario.</p>
-          <p className="text-sm mt-1">
-            Emergency physician by default. Any profession works.
-          </p>
-        </div>
-      )}
+        {state.phase === "loading" && (
+          <div className="text-gray-500 text-center py-20">Building your scenario...</div>
+        )}
+
+        {state.phase === "playing" && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2 text-xs text-gray-600 uppercase tracking-widest">
+              <span>Step {state.currentStep.stepNumber} of {state.scenario.steps.length}</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-100 mb-3">{state.scenario.title}</h2>
+              <p className="text-gray-300 leading-relaxed">{state.currentStep.situation}</p>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-4 space-y-2">
+              <p className="text-xs text-gray-600 uppercase tracking-widest mb-3">Clues</p>
+              {state.currentStep.clues.map((clue, i) => (
+                <p key={i} className="text-sm text-gray-300">{clue}</p>
+              ))}
+              <p className="text-sm text-amber-400 mt-3">Hinge: {state.currentStep.hingeClue}</p>
+              <p className="text-sm text-red-400 opacity-50 line-through mt-1">{state.currentStep.distractor}</p>
+            </div>
+            <div className="space-y-3">
+              <p className="text-xs text-gray-600 uppercase tracking-widest">What do you do?</p>
+              {state.currentStep.branches.map((branch) => (
+                <button
+                  key={branch.id}
+                  onClick={() => handleChoice(state.currentStep, branch.id, state.scenario, state.choices)}
+                  className="w-full text-left bg-gray-900 border border-gray-800 hover:border-gray-500 rounded-lg px-4 py-3 text-sm text-gray-200 transition-colors"
+                >
+                  {branch.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {state.phase === "consequence" && (
+          <div className="space-y-6">
+            <p className="text-xs text-gray-600 uppercase tracking-widest">What happened</p>
+            <p className="text-gray-200 leading-relaxed text-lg">{state.consequence}</p>
+            <button
+              onClick={() => advance(state.scenario, state.nextStepId, state.choices)}
+              className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg hover:bg-amber-300 transition-colors"
+            >
+              {state.nextStepId ? "Continue" : "Get Yoda's evaluation"}
+            </button>
+          </div>
+        )}
+
+        {state.phase === "evaluating" && (
+          <div className="text-gray-500 text-center py-20">Yoda is thinking...</div>
+        )}
+
+        {state.phase === "done" && (
+          <div className="space-y-8">
+            <div>
+              <p className="text-xs text-gray-600 uppercase tracking-widest mb-4">Yoda speaks</p>
+              <p className="text-gray-100 leading-relaxed whitespace-pre-wrap">{state.evaluation}</p>
+            </div>
+            <div className="border-t border-gray-800 pt-6 space-y-2">
+              <p className="text-xs text-gray-600 uppercase tracking-widest mb-3">Your path</p>
+              {state.choices.map((c) => (
+                <div key={c.stepId} className="text-sm">
+                  <span className="text-gray-600">Step {c.stepNumber}:</span>{" "}
+                  <span className="text-gray-300">{c.chosenBranch.text}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={reset}
+              className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg hover:bg-amber-300 transition-colors"
+            >
+              Run another scenario
+            </button>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
