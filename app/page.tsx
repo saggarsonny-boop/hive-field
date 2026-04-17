@@ -41,23 +41,12 @@ type AppState =
   | { phase: "evaluating" }
   | { phase: "done"; evaluation: string; scenario: Scenario; choices: UserChoice[] };
 
-const PROFESSIONS = [
-  "Emergency Physician",
-  "ICU Nurse",
-  "Paramedic",
-  "General Practitioner",
-  "Surgeon",
-  "Psychiatrist",
-  "Pharmacist",
-  "Radiologist",
-];
-
 export default function HiveField() {
   const [profession, setProfession] = useState("");
   const [state, setState] = useState<AppState>({ phase: "select" });
 
   async function startScenario() {
-    if (!profession) return;
+    if (!profession.trim()) return;
     setState({ phase: "loading" });
     const res = await fetch("/api/scenario", {
       method: "POST",
@@ -119,21 +108,19 @@ export default function HiveField() {
         {state.phase === "select" && (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Your profession</label>
-              <select
+              <label className="block text-sm text-gray-400 mb-2">Your role or situation</label>
+              <input
+                type="text"
                 value={profession}
                 onChange={(e) => setProfession(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-400"
-              >
-                <option value="">Select...</option>
-                {PROFESSIONS.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
+                onKeyDown={(e) => e.key === "Enter" && startScenario()}
+                placeholder="e.g. snake handler, anxious spouse, ICU nurse, hostage negotiator..."
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-gray-400"
+              />
             </div>
             <button
               onClick={startScenario}
-              disabled={!profession}
+              disabled={!profession.trim()}
               className="w-full bg-amber-400 text-gray-950 font-semibold py-3 rounded-lg disabled:opacity-30 hover:bg-amber-300 transition-colors"
             >
               Start scenario
