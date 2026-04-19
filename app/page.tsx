@@ -3,6 +3,7 @@
 import { useState } from "react";
 import AutoDemo from "@/components/AutoDemo";
 import FirstVisitCard from "@/components/FirstVisitCard";
+import LanguageSelector, { getLang, withLang } from "@/components/LanguageSelector";
 
 type Branch = {
   id: string;
@@ -56,7 +57,7 @@ export default function HiveField() {
       const res = await fetch("/api/scenario", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profession: trimmed }),
+        body: JSON.stringify({ profession: withLang(trimmed, getLang()) }),
       });
       if (!res.ok) {
         const text = await res.text();
@@ -101,7 +102,7 @@ export default function HiveField() {
       const res = await fetch("/api/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenario, choices, profession }),
+        body: JSON.stringify({ scenario, choices, profession, lang: getLang() }),
       });
       const data = await res.json();
       setState({ phase: "done", evaluation: data.evaluation, scenario, choices });
@@ -119,6 +120,7 @@ export default function HiveField() {
     <main className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-start px-4 py-12">
       <AutoDemo />
       <FirstVisitCard />
+      <LanguageSelector />
       <div className="w-full max-w-2xl">
         <h1 className="text-3xl font-bold tracking-tight mb-2">HiveField</h1>
         <p className="text-gray-500 text-sm mb-10">Reasoning under pressure. Multi-step. No hand-holding.</p>
