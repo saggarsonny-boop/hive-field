@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AutoDemo from "@/components/AutoDemo";
+import FirstVisitCard from "@/components/FirstVisitCard";
 
 type Branch = {
   id: string;
@@ -117,6 +118,7 @@ export default function HiveField() {
   return (
     <main className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-start px-4 py-12">
       <AutoDemo />
+      <FirstVisitCard />
       <div className="w-full max-w-2xl">
         <h1 className="text-3xl font-bold tracking-tight mb-2">HiveField</h1>
         <p className="text-gray-500 text-sm mb-10">Reasoning under pressure. Multi-step. No hand-holding.</p>
