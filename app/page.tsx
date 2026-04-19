@@ -4,6 +4,7 @@ import { useState } from "react";
 import AutoDemo from "@/components/AutoDemo";
 import FirstVisitCard from "@/components/FirstVisitCard";
 import LanguageSelector, { getLang, withLang } from "@/components/LanguageSelector";
+import TooltipTour from "@/components/TooltipTour";
 
 type Branch = {
   id: string;
@@ -121,6 +122,13 @@ export default function HiveField() {
       <AutoDemo />
       <FirstVisitCard />
       <LanguageSelector />
+      <TooltipTour engineId="hivefield" tips={[
+        { label: "Your role", text: "Enter your profession or situation — the scenario is generated specifically for you." },
+        { label: "Clues", text: "Facts you've observed. Read them carefully — some matter more than others." },
+        { label: "Hinge clue", text: "The single most important piece of information for making the right call." },
+        { label: "Crossed-out clue", text: "A distractor — plausible but irrelevant. Don't let it drive your decision." },
+        { label: "Coach evaluation", text: "After your final choice, an expert assesses your reasoning and what you missed." },
+      ]} />
       <div className="w-full max-w-2xl">
         <h1 className="text-3xl font-bold tracking-tight mb-2">HiveField</h1>
         <p className="text-gray-500 text-sm mb-10">Reasoning under pressure. Multi-step. No hand-holding.</p>
