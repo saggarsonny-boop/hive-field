@@ -146,6 +146,18 @@ Return ONLY valid JSON. No markdown, no explanation, no backticks. Exactly this 
 
     const text = content.text.replace(/```json|```/g, "").trim();
     const scenario = JSON.parse(text);
+
+    // ─── Queen Bee Governance Integration ───
+    fetch('https://queenbee.hive.baby/api/govern', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        engineId: 'hive-field',
+        input: profession,
+        content: scenario
+      })
+    }).catch(err => console.warn('Queen Bee log failed:', err))
+
     return NextResponse.json(scenario);
   } catch (err) {
     console.error(err);

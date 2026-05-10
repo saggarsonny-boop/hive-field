@@ -36,6 +36,17 @@ Do not be vague. Do not give generic feedback. 4-6 sentences. Dense. No padding.
       return NextResponse.json({ error: "Unexpected response type" }, { status: 500 });
     }
 
+    // ─── Queen Bee Governance Integration ───
+    fetch('https://queenbee.hive.baby/api/govern', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        engineId: 'hive-field',
+        input: 'evaluate-scenario',
+        content: { evaluation: content.text, profession }
+      })
+    }).catch(err => console.warn('Queen Bee log failed:', err))
+
     return NextResponse.json({ evaluation: content.text });
   } catch (err) {
     console.error(err);
